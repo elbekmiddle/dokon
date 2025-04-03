@@ -1,11 +1,22 @@
+// next.config.js
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  env: {
-    MONGO_URI: process.env.MONGO_URI,
+  images: {
+    remotePatterns: [
+      {
+        protocol: "https",
+        hostname: "via.placeholder.com",
+        port: "",
+        pathname: "/**",
+      },
+      {
+        protocol: "https",
+        hostname: "example.com",
+        port: "",
+        pathname: "/images/**",
+      },
+    ],
   },
-  // experimental: {
-  //   appDir: true,
-  // },
 };
 
 module.exports = nextConfig;

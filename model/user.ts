@@ -1,13 +1,13 @@
 import { Schema, model, models } from "mongoose";
 
 const UserSchema = new Schema({
-  clerkId: { type: String, required: true, unique: true }, // Clerk foydalanuvchi ID
   name: String,
   email: { type: String, required: true, unique: true },
-  imageUrl: String, // Clerk'dan keladigan avatar rasmi
+  password: { type: String, required: true },
+  imageUrl: String,
   createdAt: { type: Date, default: Date.now },
-  orders: [String], // Buyurtmalar ID ro‘yxati
-  role: { type: String, enum: ["user", "admin"], default: "user" },
+  orders: [String],
+  role: { type: String, enum: ["user", "admin"], default: "admin" },
   cart: [
     {
       productId: { type: Schema.Types.ObjectId, ref: "Product" },
@@ -16,5 +16,6 @@ const UserSchema = new Schema({
   ],
 });
 
-const User = models.User || model("User", UserSchema);
+const User = models?.User || model("User", UserSchema);
+
 export default User;

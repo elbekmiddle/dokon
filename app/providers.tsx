@@ -1,7 +1,12 @@
 "use client";
 
-import { ClerkProvider } from "@clerk/nextjs"; // Named import qilish kerak
+import { SessionProvider } from "next-auth/react";
+import { ReactNode } from "react";
 
-export function Providers({ children }: { children: React.ReactNode }) {
-  return <ClerkProvider>{children}</ClerkProvider>;
+interface ProvidersProps {
+  children: ReactNode;
+}
+
+export default function Providers({ children }: ProvidersProps) {
+  return <SessionProvider>{children}</SessionProvider>;
 }

@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
-import { ToastContainer, toast } from "react-toastify";
-import "react-toastify/dist/ReactToastify.css";
+import { useParams, useRouter } from "next/navigation";
+import { toast } from "sonner";
+import { Loader2, Minus, Plus } from "lucide-react";
+import { useSession } from "next-auth/react";
 
 interface Product {
   _id: string;
@@ -15,114 +16,208 @@ interface Product {
   imageUrlv2: string;
   imageUrlv3: string;
   imageUrlv4: string;
+  colors?: { name: string; hex: string }[];
 }
 
 export default function ProductPage() {
   const { productId } = useParams();
+  const router = useRouter();
+  const { data: session, status } = useSession();
   const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [userEmail, setUserEmail] = useState<string | null>(null);
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [selectedColor, setSelectedColor] = useState<string | null>(null);
+  const [addingToCart, setAddingToCart] = useState(false);
+  const [quantity, setQuantity] = useState(1);
 
   useEffect(() => {
     if (!productId) return;
 
-    fetch(`/api/product/${productId}`)
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.error) {
-          setError(data.error);
-        } else {
+    const fetchData = async () => {
+      try {
+        const res = await fetch(`/api/product/${productId}`);
+        const data = await res.json();
+        if (res.ok) {
           setProduct(data);
+          setSelectedImage(data.imageUrl);
+          if (data.colors && data.colors.length > 0) {
+            setSelectedColor(data.colors[0].name);
+          }
+        } else {
+          setError(data.error || "Mahsulot topilmadi");
         }
-        setLoading(false);
-      })
-      .catch(() => {
+      } catch (err) {
         setError("Server xatosi");
+      } finally {
         setLoading(false);
-      });
+      }
+    };
+
+    fetchData();
   }, [productId]);
 
-  useEffect(() => {
-    const storedEmail = localStorage.getItem("userEmail");
-    setUserEmail(storedEmail);
-  }, []);
-
   const addToCart = async () => {
-    if (!userEmail) {
-      toast.warn("Iltimos, tizimga kiring!", { position: "top-center" });
+    if (status !== "authenticated") {
+      toast.warning("Iltimos, avval tizimga kiring", {
+        action: { label: "Kirish", onClick: () => router.push("/sign-in") },
+      });
       return;
     }
 
-    if (!product) return;
+    if (!product) {
+      toast.error("Mahsulot ma'lumotlari yuklanmadi!");
+      return;
+    }
 
-    const res = await fetch("/api/cart", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email: userEmail, productId: product._id }),
-    });
+    if (product.colors && product.colors.length > 0 && !selectedColor) {
+      toast.error("Iltimos, rangni tanlang!");
+      return;
+    }
 
-    const data = await res.json();
-    if (res.ok) {
-      toast.success("Mahsulot savatga qo`shildi!", { position: "top-center" });
-    } else {
-      toast.error(data.error || "Xatolik yuz berdi!", { position: "top-center" });
+    setAddingToCart(true);
+
+    try {
+      const res = await fetch("/api/cart", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: session?.user?.email,
+          productId: product._id,
+          selectedColor: selectedColor || null,
+          quantity,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (res.ok) {
+        toast.success(`Mahsulot savatga qo'shildi`);
+        router.push("/cart");
+      } else {
+        toast.error(data.error || "Xatolik yuz berdi");
+      }
+    } catch (error) {
+      toast.error("Tarmoq xatosi yoki serverga ulanib bo'lmadi!");
+    } finally {
+      setAddingToCart(false);
     }
   };
 
-  if (loading) return <p>Yuklanmoqda...</p>;
-  if (error) return <p>Xatolik: {error}</p>;
-  if (!product) return <p>Mahsulot topilmadi</p>;
+  const incrementQuantity = () => {
+    setQuantity(prev => prev + 1);
+  };
+
+  const decrementQuantity = () => {
+    if (quantity > 1) {
+      setQuantity(prev => prev - 1);
+    }
+  };
+
+  if (loading) {
+    return <div className="flex justify-center items-center h-64"><Loader2 className="h-8 w-8 animate-spin" /></div>;
+  }
+
+  if (error) {
+    return <div className="flex justify-center items-center h-64 text-red-500">{error}</div>;
+  }
+
+  if (!product) {
+    return <div className="flex justify-center items-center h-64 text-red-500">Mahsulot topilmadi</div>;
+  }
 
   return (
-    <div className="px-40 flex flex-1 justify-center py-5 -mt-[725px] m-auto ml-8">
-      <ToastContainer />
-      <div className="layout-content-container flex flex-col max-w-[960px] flex-1">
-        <div className="flex flex-wrap gap-2 p-4">
-          <a className="text-[#637588] text-base font-medium leading-normal" href="#">
-            Qurilish materiallari
-          </a>
-          <span className="text-[#637588] text-base font-medium leading-normal"> / </span>
-          <span className="text-[#111418] text-base font-medium leading-normal">
-            {product.name}
-          </span>
-        </div>
-
-        <div className="flex w-full grow bg-white @container p-4">
-          <div className="w-full gap-1 overflow-hidden bg-white @[480px]:gap-2 aspect-[3/2] rounded-xl grid grid-cols-[2fr_1fr_1fr]">
-            <div className="w-full bg-center bg-no-repeat bg-cover aspect-auto rounded-none row-span-2">
-              <img className="max-w-[300px] rounded-xl h-full w-full" src={product.imageUrl} alt={product.name} />
-            </div>
-            <div className="w-full bg-center bg-no-repeat bg-cover aspect-auto rounded-none">
-              <img className="max-w-[300px] h-auto rounded-xl" src={product.imageUrlv1} alt={product.name} />
-            </div>
-            <div className="w-full bg-center bg-no-repeat bg-cover aspect-auto rounded-none">
-              <img className="max-w-[300px] h-auto rounded-xl" src={product.imageUrlv2} alt={product.name} />
-            </div>
-            <div className="w-full bg-center bg-no-repeat bg-cover aspect-auto rounded-none">
-              <img className="max-w-[300px] h-auto rounded-xl" src={product.imageUrlv3} alt={product.name} />
-            </div>
-            <div className="w-full bg-center bg-no-repeat bg-cover aspect-auto rounded-none">
-              <img className="max-w-[300px] h-auto rounded-xl" src={product.imageUrlv4} alt={product.name} />
-            </div>
+    <div className="container mx-auto px-6 py-10 max-w-7xl">
+      <div className="bg-white rounded-lg shadow-md p-6 grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <div className="space-y-4">
+          <div className="w-full h-96 rounded-lg overflow-hidden cursor-pointer">
+            <img
+              src={selectedImage || product?.imageUrl}
+              alt={product?.name || "Product Image"}
+              className="w-full h-full object-cover"
+            />
+          </div>
+          <div className="grid grid-cols-4 gap-2">
+            {[product?.imageUrl, product?.imageUrlv1, product?.imageUrlv2, product?.imageUrlv3, product?.imageUrlv4]
+              .filter(Boolean)
+              .map((img, index) => (
+                <img
+                  key={index}
+                  src={img}
+                  alt={product?.name}
+                  className={`w-full h-20 object-cover rounded-md cursor-pointer hover:opacity-80 ${
+                    selectedImage === img ? "border-2 border-blue-600" : ""
+                  }`}
+                  onClick={() => setSelectedImage(img ?? null)}
+                />
+              ))}
           </div>
         </div>
 
-        <h2 className="text-[#111418] text-[22px] font-bold leading-tight tracking-[-0.015em] px-4 pb-3 pt-5">
-          {product.name}
-        </h2>
-        <h1 className="text-[#111418] text-[22px] font-bold leading-tight tracking-[-0.015em] px-4 text-left pb-3 pt-5">
-          {product.price} so`m
-        </h1>
-        <p className="text-[#111418] text-base font-normal leading-normal pb-3 pt-1 px-4">
-          {product.description}
-        </p>
-        <div className="flex px-4 py-3">
+        <div className="flex flex-col justify-between">
+          <div>
+            <h1 className="text-3xl font-bold mb-4">{product?.name}</h1>
+            <p className="text-2xl font-semibold text-blue-600 mb-6">
+              {product?.price?.toLocaleString() || "N/A"} so'm
+            </p>
+            <p className="text-gray-700 mb-6">{product?.description}</p>
+
+            {product.colors && product.colors.length > 0 && (
+              <div className="mb-6">
+                <h3 className="text-lg font-semibold mb-2">Ranglar</h3>
+                <div className="flex flex-wrap gap-2">
+                  {product.colors.map((color) => (
+                    <button
+                      key={color.name}
+                      className={`px-4 py-2 rounded-full border ${
+                        selectedColor === color.name
+                          ? "border-blue-600 bg-blue-100"
+                          : "border-gray-300"
+                      }`}
+                      style={{ backgroundColor: color.hex }}
+                      onClick={() => setSelectedColor(color.name)}
+                    >
+                      {color.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div className="flex items-center mb-6">
+              <h3 className="text-lg font-semibold mr-4">Miqdor:</h3>
+              <div className="flex items-center border rounded-lg">
+                <button
+                  onClick={decrementQuantity}
+                  disabled={quantity <= 1}
+                  className="px-3 py-1 bg-gray-100 hover:bg-gray-200 disabled:opacity-50"
+                >
+                  <Minus size={16} />
+                </button>
+                <span className="px-4 py-1">{quantity}</span>
+                <button
+                  onClick={incrementQuantity}
+                  className="px-3 py-1 bg-gray-100 hover:bg-gray-200"
+                >
+                  <Plus size={16} />
+                </button>
+              </div>
+            </div>
+          </div>
+
           <button
             onClick={addToCart}
-            className="flex min-w-[84px] max-w-[480px] cursor-pointer items-center justify-center overflow-hidden rounded-xl h-10 px-4 flex-1 bg-[#1980e6] text-white text-sm font-bold leading-normal tracking-[0.015em]"
+            disabled={addingToCart}
+            className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 px-6 rounded-lg font-semibold transition disabled:opacity-70"
           >
-            <span className="truncate">Savatga qo'shish</span>
+            {addingToCart ? (
+              <span className="flex items-center justify-center">
+                <Loader2 className="h-5 w-5 animate-spin mr-2" />
+                Qo'shilyapti...
+              </span>
+            ) : (
+              "Savatga qo'shish"
+            )}
           </button>
         </div>
       </div>

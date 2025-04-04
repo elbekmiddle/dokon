@@ -1,78 +1,66 @@
-// lib/auth.ts
-import { NextAuthOptions } from "next-auth";
-import { MongoDBAdapter } from "@next-auth/mongodb-adapter";
-import clientPromise from "./mongodb-adapter";
-import connectDB from "./mongodb";
-import CredentialsProvider from "next-auth/providers/credentials";
-import bcrypt from "bcryptjs";
-import User from "@/model/user";
+// lib/auth.js
+import NextAuth, { AuthOptions } from 'next-auth';
+import CredentialsProvider from 'next-auth/providers/credentials';
+import User from '@/model/user';
+import connectDB from '@/lib/mongodb';
+import bcrypt from 'bcryptjs';
+import { NextApiRequest } from 'next';
+import { NextRequest } from 'next/server';
 
-export const authOptions: NextAuthOptions = {
-  adapter: MongoDBAdapter(clientPromise),
-  
+export const authOptions = {
   providers: [
     CredentialsProvider({
-      name: "Credentials",
+      name: 'Credentials',
       credentials: {
-        email: { label: "Email", type: "email" },
-        password: { label: "Password", type: "password" }
+        email: { label: 'Email', type: 'email' },
+        password: { label: 'Password', type: 'password' }
       },
       async authorize(credentials) {
-        await connectDB();
-        
-        try {
-          const user = await User.findOne({ email: credentials?.email });
-          if (!user) return null;
-
-          const isValid = await bcrypt.compare(
-            credentials?.password || "", 
-            user.password
-          );
-
-          if (!isValid) return null;
-
-          return {
-            id: user._id.toString(),
-            name: user.name,
-            email: user.email,
-            role: user.role || "user"
-          };
-        } catch (error) {
-          console.error("Auth error:", error);
-          return null;
+        if (!credentials?.email || !credentials?.password) {
+          throw new Error('Email va parol talab qilinadi');
         }
+
+        await connectDB();
+        const user = await User.findOne({ email: credentials.email });
+
+        if (!user) {
+          throw new Error('Bunday foydalanuvchi topilmadi');
+        }
+
+        const isPasswordValid = await bcrypt.compare(credentials.password, user.password);
+        if (!isPasswordValid) {
+          throw new Error('Noto`g`ri parol');
+        }
+
+        return { id: user._id.toString(), email: user.email, role: user.role };
       }
     })
   ],
-
   callbacks: {
-    async jwt({ token, user }) {
+    async jwt({ token, user }: { token: any; user?: any }) {
       if (user) {
-        token.role = user.role;
         token.id = user.id;
+        token.email = user.email;
+        token.role = user.role;
       }
       return token;
     },
-    async session({ session, token }) {
-      if (session.user) {
-        session.user.role = token.role;
-        session.user.id = token.id;
-        session.user.admin = token.role === "admin";
-      }
+    async session({ session, token }: { session: any; token: any }) {
+      session.user = {
+        id: token.id,
+        email: token.email,
+        role: token.role
+      };
       return session;
     }
   },
-
-  session: {
-    strategy: "jwt",
-    maxAge: 30 * 24 * 60 * 60, 
-  },
-
-  pages: {
-    signIn: "/auth/signin",
-    error: "/auth/error",
-  },
-
   secret: process.env.NEXTAUTH_SECRET,
-  debug: process.env.NODE_ENV === "development"
+  session: { strategy: 'jwt' as const },
+  pages: {
+    signIn: '/auth/login', // Custom login page
+  }
 };
+
+import { NextApiResponse } from 'next';
+
+export default (req: NextApiRequest, res: NextApiResponse) => NextAuth(req, res, authOptions);

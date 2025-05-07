@@ -1,128 +1,59 @@
 import mongoose, { Schema, Document, model } from "mongoose";
 
-// Mahsulot interfeysi
 export interface IProduct extends Document {
-  name: string;
+  title: string;
   description: string;
   price: number;
-  category: string;
-  stock: number;
+  categoryId: Schema.Types.ObjectId;
   imageUrl: string;
-  imageUrlv1: string;
-  imageUrlv2: string;
-  imageUrlv3: string;
-  imageUrlv4: string;
-  colors: string[];
+  status: 'active' | 'inactive' | 'draft';
   createdAt: Date;
   updatedAt: Date;
 }
 
-// Ranglarni tekshirish uchun validatsiya funktsiyasi
-const validateColors = (colors: string[]) => {
-  const allowedColors = ["yashil", "oq", "sariq", "qizil"];
-  if (colors.length !== 4) return false;
-  return colors.every(color => allowedColors.includes(color));
-};
-
-// MongoDB modeli
 const ProductSchema = new Schema<IProduct>(
   {
-    name: { 
+    title: { 
       type: String, 
-      required: [true, "Mahsulot nomi talab qilinadi"],
+      required: [true, "Title is required"],
       trim: true,
-      maxlength: [100, "Mahsulot nomi 100 ta belgidan oshmasligi kerak"]
+      maxlength: [100, "Title cannot exceed 100 characters"]
     },
     description: { 
       type: String, 
-      required: [true, "Mahsulot tavsifi talab qilinadi"],
+      required: [true, "Description is required"],
       trim: true,
-      maxlength: [1000, "Tavsif 1000 ta belgidan oshmasligi kerak"]
+      maxlength: [1000, "Description cannot exceed 1000 characters"]
     },
     price: { 
       type: Number, 
-      required: [true, "Narx talab qilinadi"],
-      min: [0, "Narx manfiy bo'lishi mumkin emas"]
+      required: [true, "Price is required"],
+      min: [0, "Price cannot be negative"]
     },
-    category: { 
-      type: String, 
-      required: [true, "Kategoriya talab qilinadi"],
-      enum: {
-        values: ["elektronika", "kiyim", "oziq-ovqat", "uy-ro'zg'or"],
-        message: "Noto'g'ri kategoriya"
-      }
-    },
-    stock: { 
-      type: Number, 
-      required: [true, "Soni talab qilinadi"],
-      min: [0, "Soni manfiy bo'lishi mumkin emas"],
-      default: 0
+    categoryId: { 
+      type: Schema.Types.ObjectId, 
+      ref: 'Category',
+      required: [true, "Category is required"]
     },
     imageUrl: { 
       type: String, 
-      required: [true, "Asosiy rasm talab qilinadi"],
+      required: [true, "Image URL is required"],
       validate: {
         validator: (value: string) => {
           return /^https?:\/\/.+\.(jpg|jpeg|png|webp)$/.test(value);
         },
-        message: "Noto'g'ri rasm formati"
+        message: "Invalid image URL format"
       }
     },
-    imageUrlv1: { 
-      type: String, 
-      required: [true, "1-variant rasmi talab qilinadi"],
-      validate: {
-        validator: (value: string) => {
-          return /^https?:\/\/.+\.(jpg|jpeg|png|webp)$/.test(value);
-        },
-        message: "Noto'g'ri rasm formati"
-      }
-    },
-    imageUrlv2: { 
-      type: String, 
-      required: [true, "2-variant rasmi talab qilinadi"],
-      validate: {
-        validator: (value: string) => {
-          return /^https?:\/\/.+\.(jpg|jpeg|png|webp)$/.test(value);
-        },
-        message: "Noto'g'ri rasm formati"
-      }
-    },
-    imageUrlv3: { 
-      type: String, 
-      required: [true, "3-variant rasmi talab qilinadi"],
-      validate: {
-        validator: (value: string) => {
-          return /^https?:\/\/.+\.(jpg|jpeg|png|webp)$/.test(value);
-        },
-        message: "Noto'g'ri rasm formati"
-      }
-    },
-    imageUrlv4: { 
-      type: String, 
-      required: [true, "4-variant rasmi talab qilinadi"],
-      validate: {
-        validator: (value: string) => {
-          return /^https?:\/\/.+\.(jpg|jpeg|png|webp)$/.test(value);
-        },
-        message: "Noto'g'ri rasm formati"
-      }
-    },
-    colors: {
-      type: [String],
-      required: [true, "Ranglar talab qilinadi"],
-      validate: {
-        validator: validateColors,
-        message: "Faqat 4 ta rang (yashil, oq, sariq, qizil) bo'lishi kerak"
-      }
+    status: {
+      type: String,
+      enum: ['active', 'inactive', 'draft'],
+      default: 'active'
     }
   },
   { 
-    timestamps: true, // createdAt va updatedAt avtomatik qo'shiladi
-    toJSON: { virtuals: true },
-    toObject: { virtuals: true }
+    timestamps: true
   }
 );
 
-// Modelni eksport qilish
 export default mongoose.models.Product || model<IProduct>("Product", ProductSchema);

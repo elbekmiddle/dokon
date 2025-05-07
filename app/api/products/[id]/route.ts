@@ -1,46 +1,87 @@
-// import { dbConnect } from "@/lib/dbConnect";
-import { connectDB } from "@/utils/dbConnect";
-import Product from "@/model/product";
-import { NextResponse } from "next/server";
+// app/api/admin/products/[id]/route.ts
+import  connectToDatabase  from '@/lib/mongodb';
+import Product from '@/model/product';
+import { NextResponse } from 'next/server';
 
-export async function GET(request: Request, { params }: { params: { id: string } }) {
+export async function PATCH(
+  request: Request,
+  { params }: { params: { id: string } }
+) {
   try {
-    await connectDB();
-    const product = await Product.findById(params.id);
-    if (!product) {
-      return NextResponse.json({ error: "Product not found" }, { status: 404 });
+    await connectToDatabase();
+    const updateData = await request.json();
+    
+    // Validate required fields
+    if (!updateData.name || !updateData.price || !updateData.category) {
+      return NextResponse.json(
+        { success: false, message: 'Majburiy maydonlar to\'ldirilmagan' },
+        { status: 400 }
+      );
     }
-    return NextResponse.json(product);
-  } catch (error) {
+
+    const updatedProduct = await Product.findByIdAndUpdate(
+      params.id,
+      updateData,
+      { new: true }
+    );
+    
+    if (!updatedProduct) {
+      return NextResponse.json(
+        { success: false, message: 'Mahsulot topilmadi' },
+        { status: 404 }
+      );
+    }
+    
     return NextResponse.json(
-      { error: "Failed to fetch product" },
+      { 
+        success: true,
+        message: 'Mahsulot muvaffaqiyatli yangilandi',
+        product: updatedProduct 
+      },
+      { status: 200 }
+    );
+  } catch (error) {
+    console.error('Update error:', error);
+    return NextResponse.json(
+      { 
+        success: false,
+        message: 'Server xatosi: ' + (error as Error).message 
+      },
       { status: 500 }
     );
   }
 }
 
-export async function PUT(request: Request, { params }: { params: { id: string } }) {
+export async function DELETE(
+  request: Request,
+  { params }: { params: { id: string } }
+) {
   try {
-    await connectDB();
-    const data = await request.json();
-    const product = await Product.findByIdAndUpdate(params.id, data, { new: true });
-    return NextResponse.json(product);
-  } catch (error) {
+    await connectToDatabase();
+    
+    const deletedProduct = await Product.findByIdAndDelete(params.id);
+    
+    if (!deletedProduct) {
+      return NextResponse.json(
+        { success: false, message: 'Mahsulot topilmadi' },
+        { status: 404 }
+      );
+    }
+    
     return NextResponse.json(
-      { error: "Failed to update product" },
-      { status: 500 }
+      { 
+        success: true,
+        message: 'Mahsulot muvaffaqiyatli o\'chirildi'
+      },
+      { status: 200 }
     );
-  }
-}
-
-export async function DELETE(request: Request, { params }: { params: { id: string } }) {
-  try {
-    await connectDB();
-    await Product.findByIdAndDelete(params.id);
-    return NextResponse.json({ success: true });
   } catch (error) {
+    console.error('Delete error:', error);
     return NextResponse.json(
-      { error: "Failed to delete product" },
+      { 
+        success: false,
+        message: 'Server xatosi: ' + (error as Error).message 
+      },
       { status: 500 }
     );
   }

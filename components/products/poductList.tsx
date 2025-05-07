@@ -53,7 +53,7 @@ const ProductList = () => {
           >
             <Link href={`/product/${product._id}`} className="block w-full">
               <div className="overflow-hidden rounded-xl">
-                <img
+                <img 
                   src={product.imageUrl}
                   alt={product.name}
                   className="w-full h-48 object-contain rounded-xl transition-transform duration-300 ease-in-out hover:scale-105"

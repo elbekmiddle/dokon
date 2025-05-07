@@ -1,66 +1,117 @@
-// lib/auth.js
-import NextAuth, { AuthOptions } from 'next-auth';
+// lib/auth.ts
+import NextAuth, { NextAuthOptions } from 'next-auth';
 import CredentialsProvider from 'next-auth/providers/credentials';
-import User from '@/model/user';
-import connectDB from '@/lib/mongodb';
+import  connectToDatabase  from './mongodb';
 import bcrypt from 'bcryptjs';
-import { NextApiRequest } from 'next';
-import { NextRequest } from 'next/server';
+import { JWT } from 'next-auth/jwt';
 
-export const authOptions = {
+declare module 'next-auth' {
+  interface Session {
+    user: {
+      id: string;
+      email: string;
+      name: string;
+      isAdmin: boolean;
+    } & CustomUser;
+  }
+
+  interface User {
+    id: string;
+    email: string;
+    name?: string;
+    role: 'user' | 'admin';
+    isAdmin: boolean;
+  }
+}
+
+declare module 'next-auth/jwt' {
+  interface JWT {
+    id: string;
+    email: string;
+    name?: string;
+    role: 'user' | 'admin';
+    isAdmin: boolean;
+  }
+}
+
+export const authOptions: NextAuthOptions = {
   providers: [
     CredentialsProvider({
       name: 'Credentials',
       credentials: {
-        email: { label: 'Email', type: 'email' },
-        password: { label: 'Password', type: 'password' }
+        email: { label: "Email", type: "email" },
+        password: { label: "Password", type: "password" }
       },
       async authorize(credentials) {
-        if (!credentials?.email || !credentials?.password) {
-          throw new Error('Email va parol talab qilinadi');
+        try {
+          if (!credentials?.email || !credentials?.password) {
+            throw new Error('Email and password are required');
+          }
+
+          const mongoose = await connectToDatabase(process.env.MONGODB_URI || '');
+          
+          const user = await mongoose.connection.collection('users').findOne({ 
+            email: credentials.email.toLowerCase().trim()
+          });
+
+          if (!user) {
+            throw new Error('User not found');
+          }
+
+          const isValid = await bcrypt.compare(credentials.password, user.password);
+          if (!isValid) {
+            throw new Error('Invalid password');
+          }
+
+          const isAdmin = user.email === process.env.ADMIN_EMAIL || user.role === 'admin';
+
+          return {
+            id: user._id.toString(),
+            email: user.email,
+            name: user.name,
+            role: isAdmin ? 'admin' : 'user',
+            isAdmin
+          };
+        } catch (error) {
+          console.error('Authentication error:', error);
+          return null;
         }
-
-        await connectDB();
-        const user = await User.findOne({ email: credentials.email });
-
-        if (!user) {
-          throw new Error('Bunday foydalanuvchi topilmadi');
-        }
-
-        const isPasswordValid = await bcrypt.compare(credentials.password, user.password);
-        if (!isPasswordValid) {
-          throw new Error('Noto`g`ri parol');
-        }
-
-        return { id: user._id.toString(), email: user.email, role: user.role };
       }
     })
   ],
   callbacks: {
-    async jwt({ token, user }: { token: any; user?: any }) {
+    async jwt({ token, user }) {
       if (user) {
         token.id = user.id;
         token.email = user.email;
+        token.name = user.name;
         token.role = user.role;
+        token.isAdmin = user.isAdmin;
       }
       return token;
     },
-    async session({ session, token }: { session: any; token: any }) {
+    async session({ session, token }) {
       session.user = {
         id: token.id,
         email: token.email,
-        role: token.role
+        name: token.name || '',
+        role: token.role,
+        isAdmin: token.isAdmin
       };
       return session;
     }
   },
-  secret: process.env.NEXTAUTH_SECRET,
-  session: { strategy: 'jwt' as const },
+  session: {
+    strategy: 'jwt',
+    maxAge: 30 * 24 * 60 * 60, // 30 days
+  },
   pages: {
-    signIn: '/auth/login', // Custom login page
-  }
+    signIn: '/auth/login',
+    error: '/auth/error'
+  },
+  secret: process.env.NEXTAUTH_SECRET,
+  debug: process.env.NODE_ENV === 'development'
 };
 
-import { NextApiResponse } from 'next';
-
-export default (req: NextApiRequest, res: NextApiResponse) => NextAuth(req, res, authOptions);
+export default NextAuth(authOptions);
+export const { auth, signIn, signOut } = NextAuth(authOptions);

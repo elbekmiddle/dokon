@@ -6,22 +6,17 @@ if (!MONGODB_URI) {
   throw new Error("❌ Please define the MONGODB_URI environment variable inside .env");
 }
 
-interface MongooseConn {
-  conn: Mongoose | null;
-  promise: Promise<Mongoose> | null;
-}
-
 declare global {
-  var mongoose: MongooseConn;
+  var mongoose: { conn: Mongoose | null; promise: Promise<Mongoose> | null };
 }
 
 let cached = global.mongoose || { conn: null, promise: null };
-  
+
 if (!global.mongoose) {
-  global.mongoose = { conn: null, promise: null };
+  global.mongoose = cached;
 }
 
-const connectDB = async () => {
+const connectDB = async (p0: string) => {
   if (cached.conn) {
     console.log("🔄 Using existing MongoDB connection.");
     return cached.conn;
@@ -31,9 +26,9 @@ const connectDB = async () => {
     const opts = {
       dbName: "dokoncha",
       bufferCommands: false,
-      connectTimeoutMS: 10000, // 10 sekundga oshirildi
-      serverSelectionTimeoutMS: 10000, // Server tanlash uchun vaqt
-      socketTimeoutMS: 20000, // Socket timeout
+      connectTimeoutMS: 10000,
+      serverSelectionTimeoutMS: 10000,
+      socketTimeoutMS: 20000,
     };
 
     console.log("⏳ Connecting to MongoDB...");
@@ -46,13 +41,7 @@ const connectDB = async () => {
     });
   }
 
-  try {
-    cached.conn = await cached.promise;
-  } catch (err) {
-    cached.promise = null;
-    throw err;
-  }
-
+  cached.conn = await cached.promise;
   return cached.conn;
 };
 

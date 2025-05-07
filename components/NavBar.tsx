@@ -14,12 +14,10 @@ declare module "next-auth" {
   interface Session {
     user: {
       id: string;
-      admin: any;
-      name?: string | null;
-      email?: string | null;
-      image?: string | null;
-      role?: string | null;
-    };
+      email: string;
+      name: string;
+      isAdmin: boolean;
+    } & CustomUser;
   }
 }
 import { signOut } from "next-auth/react";

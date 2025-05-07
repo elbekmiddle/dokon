@@ -28,7 +28,7 @@ export async function GET(request: Request) {
   }
 
   try {
-    await connectDB();
+    await connectDB(process.env.MONGODB_URI || "");
     
     const user = await User.findOne({ email })
       .populate({
@@ -76,7 +76,7 @@ export async function POST(request: Request) {
       return errorResponse("Noto'g'ri mahsulot ID formati", 400);
     }
 
-    await connectDB();
+    await connectDB(process.env.MONGODB_URI || "");
     
     const user = await User.findOne({ email });
     if (!user) {
@@ -134,7 +134,7 @@ export async function PUT(request: Request) {
       return errorResponse("Noto'g'ri miqdor formati", 400);
     }
 
-    await connectDB();
+    await connectDB(process.env.MONGODB_URI || "");
     
     const user = await User.findOne({ email });
     if (!user) {
@@ -183,7 +183,7 @@ export async function DELETE(request: Request) {
       return errorResponse("Noto'g'ri mahsulot ID formati", 400);
     }
 
-    await connectDB();
+    await connectDB(process.env.MONGODB_URI || "");
     
     const user = await User.findOne({ email });
     if (!user) {
